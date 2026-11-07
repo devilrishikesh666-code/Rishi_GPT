@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rishi GPT</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script>
+    tailwind.config = { darkMode: 'class' };
+  </script>
+  <style>
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    pre { background: #1e293b; color: #f8fafc; padding: 1rem; border-radius: 0.5rem; overflow-x: auto; }
+    code { font-family: monospace; }
+  </style>
+</head>
+<body class="bg-gray-50 text-gray-800 dark:bg-gray-900 dark:text-gray-100 flex flex-col min-h-screen">
+  <div id="loading" class="fixed inset-0 z-50 flex items-center justify-center bg-white dark:bg-gray-900 text-xl font-semibold">
+    Loading Rishi GPT...
+  </div>
+
+  <div id="app" class="flex flex-1 w-full min-h-screen relative overflow-hidden hidden">
+    <!-- Sidebar -->
+    <aside id="sidebar" class="fixed inset-y-0 left-0 z-40 w-72 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 transform -translate-x-full md:translate-x-0 transition-transform duration-200 ease-in-out flex flex-col">
+      <div class="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+        <h1 class="text-xl font-bold text-indigo-600 dark:text-indigo-400">Rishi GPT</h1>
+        <button id="close-sidebar-btn" class="md:hidden text-gray-500 hover:text-gray-700 dark:text-gray-400">✕</button>
+      </div>
+      <div class="p-3">
+        <button id="new-chat-btn" class="w-full py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg shadow transition">
+          + New Chat
+        </button>
+      </div>
+      <div id="chat-list" class="flex-1 overflow-y-auto px-3 space-y-1 no-scrollbar"></div>
+      <div class="p-3 border-t border-gray-200 dark:border-gray-700 space-y-2">
+        <button id="toggle-dark-btn" class="w-full py-2 px-3 text-left text-sm rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center justify-between">
+          <span>🌙 Dark Mode</span>
+          <span id="dark-status" class="text-xs text-gray-400">Off</span>
+        </button>
+        <button id="open-settings-btn" class="w-full py-2 px-3 text-left text-sm rounded-md hover:bg-gray-100 dark:hover:bg-gray-700">
+          ⚙️ Settings & Prompt
+        </button>
+      </div>
+    </aside>
+
+    <!-- Overlay -->
+    <div id="sidebar-overlay" class="fixed inset-0 bg-black/40 z-30 hidden md:hidden"></div>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col min-h-screen md:ml-72 w-full">
+      <header class="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between bg-white/80 dark:bg-gray-800/80 backdrop-blur sticky top-0 z-10">
+        <div class="flex items-center gap-3">
+          <button id="open-sidebar-btn" class="md:hidden text-gray-600 dark:text-gray-300">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+          </button>
+          <span id="current-chat-title" class="font-semibold text-lg truncate max-w-[200px] sm:max-w-md">New Chat</span>
+        </div>
+        <div class="text-xs text-gray-500 dark:text-gray-400" id="current-model-badge"></div>
+      </header>
+
+      <!-- Chat Container -->
+      <div id="messages-container" class="flex-1 overflow-y-auto p-4 space-y-4 max-w-4xl w-full mx-auto pb-32"></div>
+
+      <!-- Sticky Input Bar -->
+      <div class="fixed bottom-0 left-0 right-0 md:left-72 bg-gradient-to-t from-gray-50 dark:from-gray-900 via-gray-50 dark:via-gray-900 to-transparent p-4 z-20">
+        <form id="chat-form" class="max-w-4xl mx-auto relative flex items-center">
+          <textarea id="chat-input" rows="1" placeholder="Message Rishi GPT..." class="w-full p-3 pr-12 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none max-h-32 shadow-lg" style="min-height: 48px;"></textarea>
+          <button type="submit" id="send-btn" class="absolute right-2 p-2 text-indigo-600 dark:text-indigo-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9-7-9-7-9 7 9 7zm0 0v-8"></path></svg>
+          </button>
+        </form>
+      </div>
+    </main>
+  </div>
+
+  <!-- Settings Modal -->
+  <div id="settings-modal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white dark:bg-gray-800 rounded-xl p-6 max-w-md w-full shadow-2xl space-y-4">
+      <h2 class="text-xl font-bold">Settings</h2>
+      <div>
+        <label class="block text-sm font-medium mb-1">OpenRouter API Key</label>
+        <input type="password" id="api-key-input" class="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600" placeholder="sk-or-v1-...">
+      </div>
+      <div>
+        <label class="block text-sm font-medium mb-1">Model Name</label>
+        <input type="text" id="model-input" class="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600" placeholder="deepseek/deepseek-r1:free">
+      </div>
+      <div>
+        <label class="block text-sm font-medium mb-1">System Prompt</label>
+        <textarea id="system-prompt-input" rows="3" class="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600" placeholder="You are Rishi GPT, a helpful assistant..."></textarea>
+      </div>
+      <div class="flex justify-end gap-2 pt-2">
+        <button id="close-settings-btn" class="px-4 py-2 border rounded hover:bg-gray-100 dark:hover:bg-gray-700">Cancel</button>
+        <button id="save-settings-btn" class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const state = {
+        apiKey: localStorage.getItem("rishi_api_key") || "",
+        model: localStorage.getItem("rishi_model") || "deepseek/deepseek-r1:free",
+        systemPrompt: localStorage.getItem("rishi_system_prompt") || "You are Rishi GPT, a helpful, precise AI assistant.",
+        darkMode: localStorage.getItem("rishi_dark") === "true",
+        chats: JSON.parse(localStorage.getItem("rishi_chats") || "[]"),
+        activeChatId: localStorage.getItem("rishi_active_id") || null,
+        isGenerating: false
+      };
+
+      const $ = (id) => document.getElementById(id);
+      const els = {
+        loading: $("loading"), app: $("app"), sidebar: $("sidebar"), overlay: $("sidebar-overlay"),
+        chatList: $("chat-list"), messages: $("messages-container"), chatForm: $("chat-form"),
+        input: $("chat-input"), chatTitle: $("current-chat-title"), modelBadge: $("current-model-badge"),
+        settingsModal: $("settings-modal"), apiKeyInput: $("api-key-input"), modelInput: $("model-input"),
+        systemPromptInput: $("system-prompt-input"), darkStatus: $("dark-status")
+      };
+
+      function saveState() {
+        localStorage.setItem("rishi_api_key", state.apiKey);
+        localStorage.setItem("rishi_model", state.model);
+        localStorage.setItem("rishi_system_prompt", state.systemPrompt);
+        localStorage.setItem("rishi_dark", state.darkMode);
+        localStorage.setItem("rishi_chats", JSON.stringify(state.chats));
+        localStorage.setItem("rishi_active_id", state.activeChatId || "");
+      }
+
+      function init() {
+        if (state.darkMode) document.documentElement.classList.add("dark");
+        els.darkStatus.textContent = state.darkMode ? "On" : "Off";
+        els.modelBadge.textContent = state.model;
+        if (!state.chats.length) createNewChat();
+        else if (!state.activeChatId || !state.chats.find(c => c.id === state.activeChatId)) {
+          state.activeChatId = state.chats[0].id;
+        }
+        renderSidebar();
+        renderMessages();
+        els.loading.classList.add("hidden");
+        els.app.classList.remove("hidden");
+      }
+
+      function createNewChat() {
+        const newChat = { id: Date.now().toString(), title: "New Chat", messages: [] };
+        state.chats.unshift(newChat);
+        state.activeChatId = newChat.id;
+        saveState();
+        renderSidebar();
+        renderMessages();
+      }
+
+      function getActiveChat() {
+        return state.chats.find(c => c.id === state.activeChatId);
+      }
+
+      function renderSidebar() {
+        els.chatList.innerHTML = "";
+        state.chats.forEach(chat => {
+          const isActive = chat.id === state.activeChatId;
+          const div = document.createElement("div");
+          div.className = `group flex items-center justify-between p-2 rounded-lg cursor-pointer text-sm ${isActive ? 'bg-indigo-100 dark:bg-gray-700 text-indigo-900 dark:text-indigo-200 font-medium' : 'hover:bg-gray-100 dark:hover:bg-gray-700'}`;
+          div.innerHTML = `
+            <span class="truncate flex-1 mr-2">${escapeHtml(chat.title)}</span>
+            <div class="hidden group-hover:flex items-center gap-1">
+              <button data-action="rename" data-id="${chat.id}" class="text-xs hover:text-indigo-600">✏️</button>
+              <button data-action="delete" data-id="${chat.id}" class="text-xs hover:text-red-600">🗑️</button>
+            </div>
+          `;
+          div.onclick = (e) => {
+            const act = e.target.dataset.action;
+            if (act === "rename") renameChat(chat.id);
+            else if (act === "delete") deleteChat(chat.id);
+            else { state.activeChatId = chat.id; saveState(); renderSidebar(); renderMessages(); toggleSidebar(false); }
+          };
+          els.chatList.appendChild(div);
+        });
+      }
+
+      function renderMessages() {
+        const chat = getActiveChat();
+        els.chatTitle.textContent = chat ? chat.title : "New Chat";
+        els.messages.innerHTML = "";
+        if (!chat || !chat.messages.length) {
+          els.messages.innerHTML = `<div class="text-center text-gray-400 mt-20">Ask Rishi GPT anything to begin!</div>`;
+          return;
+        }
+        chat.messages.forEach(msg => appendMessageUI(msg.role, msg.content));
+        scrollToBottom();
+      }
+
+      function appendMessageUI(role, content) {
+        const isUser = role === "user";
+        const wrapper = document.createElement("div");
+        wrapper.className = `flex ${isUser ? 'justify-end' : 'justify-start'} w-full`;
+        const inner = document.createElement("div");
+        inner.className = `max-w-[85%] p-4 rounded-2xl ${isUser ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-bl-none shadow-sm'}`;
+        inner.innerHTML = isUser ? `<p class="whitespace-pre-wrap">${escapeHtml(content)}</p>` : marked.parse(content || "");
+        wrapper.appendChild(inner);
+        els.messages.appendChild(wrapper);
+        return inner;
+      }
+
+      function renameChat(id) {
+        const chat = state.chats.find(c => c.id === id);
+        if (!chat) return;
+        const name = prompt("Rename chat:", chat.title);
+        if (name && name.trim()) { chat.title = name.trim(); saveState(); renderSidebar(); renderMessages(); }
+      }
+
+      function deleteChat(id) {
+        state.chats = state.chats.filter(c => c.id !== id);
+        if (!state.chats.length) createNewChat();
+        else { if (state.activeChatId === id) state.activeChatId = state.chats[0].id; saveState(); renderSidebar(); renderMessages(); }
+      }
+
+      function toggleSidebar(show) {
+        els.sidebar.classList.toggle("-translate-x-full", !show);
+        els.overlay.classList.toggle("hidden", !show);
+      }
+
+      function scrollToBottom() {
+        els.messages.scrollTop = els.messages.scrollHeight;
+      }
+
+      function escapeHtml(str) {
+        return str.replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+      }
+
+      els.chatForm.onsubmit = async (e) => {
+        e.preventDefault();
+        const text = els.input.value.trim();
+        if (!text || state.isGenerating) return;
+        if (!state.apiKey) return alert("Please enter your OpenRouter API Key in Settings!");
+
+        const chat = getActiveChat();
+        if (chat.messages.length === 0) chat.title = text.slice(0, 30);
+        chat.messages.push({ role: "user", content: text });
+        els.input.value = "";
+        els.input.style.height = "48px";
+        renderMessages();
+
+        state.isGenerating = true;
+        const aiMsgDiv = appendMessageUI("assistant", "...");
+        let aiText = "";
+
+        try {
+          const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+            method: "POST",
+            headers: { "Authorization": `Bearer ${state.apiKey}`, "Content-Type": "application/json" },
+            body: JSON.stringify({
+              model: state.model,
+              messages: [{ role: "system", content: state.systemPrompt }, ...chat.messages],
+              stream: true
+            })
+          });
+
+          if (!res.ok) throw new Error(`API Error: ${res.status}`);
+          const reader = res.body.getReader();
+          const decoder = new TextDecoder();
+          aiMsgDiv.innerHTML = "";
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            const chunk = decoder.decode(value);
+            const lines = chunk.split("\n").filter(l => l.trim().startsWith("data: "));
+            for (const line of lines) {
+              const jsonStr = line.replace("data: ", "").trim();
+              if (jsonStr === "[DONE]") break;
+              try {
+                const parsed = JSON.parse(jsonStr);
+                const token = parsed.choices?.[0]?.delta?.content || "";
+                aiText += token;
+                aiMsgDiv.innerHTML = marked.parse(aiText);
+                scrollToBottom();
+              } catch (_) {}
+            }
+          }
+          chat.messages.push({ role: "assistant", content: aiText });
+          saveState();
+        } catch (err) {
+          aiMsgDiv.innerHTML = `<span class="text-red-500">Error: ${err.message}</span>`;
+        } finally {
+          state.isGenerating = false;
+        }
+      };
+
+      // UI Listeners
+      $("open-sidebar-btn").onclick = () => toggleSidebar(true);
+      $("close-sidebar-btn").onclick = () => toggleSidebar(false);
+      els.overlay.onclick = () => toggleSidebar(false);
+      $("new-chat-btn").onclick = () => { createNewChat(); toggleSidebar(false); };
+      
+      $("toggle-dark-btn").onclick = () => {
+        state.darkMode = !state.darkMode;
+        document.documentElement.classList.toggle("dark", state.darkMode);
+        els.darkStatus.textContent = state.darkMode ? "On" : "Off";
+        saveState();
+      };
+
+      $("open-settings-btn").onclick = () => {
+        els.apiKeyInput.value = state.apiKey;
+        els.modelInput.value = state.model;
+        els.systemPromptInput.value = state.systemPrompt;
+        els.settingsModal.classList.remove("hidden");
+      };
+
+      $("close-settings-btn").onclick = () => els.settingsModal.classList.add("hidden");
+      $("save-settings-btn").onclick = () => {
+        state.apiKey = els.apiKeyInput.value.trim();
+        state.model = els.modelInput.value.trim() || "deepseek/deepseek-r1:free";
+        state.systemPrompt = els.systemPromptInput.value.trim();
+        els.modelBadge.textContent = state.model;
+        saveState();
+        els.settingsModal.classList.add("hidden");
+      };
+
+      els.input.addEventListener("input", function () {
+        this.style.height = "auto";
+        this.style.height = Math.min(this.scrollHeight, 128) + "px";
+      });
+
+      init();
+    });
+  </script>
+</body>
+</html>
